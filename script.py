@@ -47,7 +47,8 @@ def check_endpoints_status(endpoints_list, connection, config):
     downpoints = list()
     for ep in endpoints_list:
         try:
-            response = requests.post('http://' + ep, timeout=(1, 2))
+            response = requests.post('http://' + ep.replace(
+                'http://', '').replace('https://', ''), timeout=(1, 2))
 
             if not check_content(ep, str(response.content), config):
                 downpoints.append((ep, 'content-mismatch'))

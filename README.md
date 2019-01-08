@@ -42,15 +42,19 @@ A sample of **unencrypted options.json** can be:
       ]
     }
   },
-  "webhooks": [
-    "my-slack-bot-webhook-1",
-    "my-slack-bot-webhook-2"
-  ]
+  "webhooks": {
+    "my-slack-bot-webhook-1": {
+      "tags": ["@user1", "@user2"]
+    }
+    "my-slack-bot-webhook-2": {
+      "tags": []
+    }
+  }
 }
 ```
 If options file is specified in higher level config, each endpoint can have `strings` list that program can match against. For example, for `my-endpoint-2`, program will check the returned response and if `string-1` and `string-2` exist in response, it is considered okay. If not, it will be considered down. In other cases like **connection timeout or 500** errors, it will be considered down again.
 
-You can also specifiy slack webhooks in options file and program will send you a message in case it detects any down endpoint.
+You can also specifiy slack webhooks in options file and program will send a message in case it detects any down endpoint.
 
 ## Encryption / Decryption
 You can encrypt / decrypt data using `crypto.py` script. **(AES-256 Encryption)**

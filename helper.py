@@ -62,7 +62,7 @@ def display_endpoints():
 
 def send_to_slack(data):
 
-    prepared_string = '\n*%d/%d* endpoints are up.\n' % (
+    prepared_string = '*%d/%d* endpoints are up.\n' % (
         data['total'] - len(data['down']), data['total'])
 
     prepared_string += 'Following endpoints seem to be down.\n'
@@ -75,12 +75,15 @@ def send_to_slack(data):
         logger.info('No webhook is specified. Exiting program.')
         exit()
 
-    for hook in config['options']['webhooks']:
+    for url, data in config['options']['webhooks'].items():
 
         response, _count = (None, 0)
         while not response and _count < 5:
             try:
-                response = requests.post(hook, json={'text': prepared_string})
+                response = requests.post(url, json={
+                    'text': ' '.join(data.get(
+                        'tags', list())) + '\n' + prepared_string
+                })
             except:
                 logger.info('Could not send slack request. ' +
                             'Retrying after 10 secs...')
