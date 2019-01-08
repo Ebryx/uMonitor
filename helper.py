@@ -60,6 +60,62 @@ def display_endpoints():
         print('"%s",' % (ep))
 
 
+def get_slack_user_ids(tags, config):
+
+    if not config['options'].get('slack_bot_access_token'):
+        logger.info('`slack_bot_access_token` is required in ' +
+                    'options to get user ids.')
+
+        return list()
+
+    response = requests.get(
+        'https://slack.com/api/users.list?token=' +
+        config['options']['slack_bot_access_token']).json()
+
+    if not(response.get('ok') and response.get('members')):
+        logger.info('Failed to get userIDs for link tags: %s' % (tags))
+
+    user_ids = list()
+    for uname in tags:
+        for member in response['members']:
+            if not(member.get('profile') and member[
+                    'profile'].get('display_name')):
+                continue
+            if member['profile']['display_name'] == \
+                    uname.replace('@', str()):
+                user_ids.append(member['id'])
+
+    logger.info('Detected user ids for slack are: %s' % (user_ids))
+    return user_ids
+
+
+def get_slack_team_ids(tags, config):
+
+    if not config['options'].get('slack_workstation_access_token'):
+        logger.info('`slack_workstation_access_token` is required in ' +
+                    'options to get team ids.')
+        return list()
+
+    response = requests.get(
+        'https://slack.com/api/usergroups.list?token=' +
+        config['options']['slack_workstation_access_token']).json()
+
+    if not(response.get('ok') and response.get('usergroups')):
+        logger.info('Failed to get teamIDs for link tags: %s' % (tags))
+
+    team_ids = list()
+    for tname in tags:
+        for group in response['usergroups']:
+            if not(group.get('handle') and group.get('id')):
+                continue
+
+            if group['handle'] == tname.replace('@', str()):
+                team_ids.append(group['id'])
+
+    logger.info('Detected team ids for slack are: %s' % (team_ids))
+    return team_ids
+
+
 def send_to_slack(data):
 
     prepared_string = '*%d/%d* endpoints are up.\n' % (
@@ -77,12 +133,16 @@ def send_to_slack(data):
 
     for url, data in config['options']['webhooks'].items():
 
+        users = get_slack_user_ids(data.get('tags', list()), config)
+        teams = get_slack_team_ids(data.get('tags', list()), config)
+        tag_string = ' '.join(['<@%s>' % x for x in users]) + ' '
+        tag_string += ' '.join(['<!subteam^%s>' % x for x in teams]) + '\n'
+
         response, _count = (None, 0)
         while not response and _count < 5:
             try:
                 response = requests.post(url, json={
-                    'text': ' '.join(data.get(
-                        'tags', list())) + '\n' + prepared_string
+                    'text': tag_string + prepared_string
                 })
             except:
                 logger.info('Could not send slack request. ' +
@@ -94,9 +154,9 @@ def send_to_slack(data):
             continue
 
         if response.status_code == 200:
-            logger.info('Pushed successfully.')
+            logger.info('Pushed message to slack successfully.')
         else:
-            logger.info('Could not push message: <(%s) %s>' % (
+            logger.info('Could not push message to slack: <(%s) %s>' % (
                 response.status_code, response.content.decode('utf8')))
 
 

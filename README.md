@@ -42,9 +42,11 @@ A sample of **unencrypted options.json** can be:
       ]
     }
   },
+  "slack_bot_access_token": "xoxb-slack-token",
+  "slack_workstation_access_token": "xoxp-slack-token",
   "webhooks": {
     "my-slack-bot-webhook-1": {
-      "tags": ["@user1", "@user2"]
+      "tags": ["user1", "@user2"]
     }
     "my-slack-bot-webhook-2": {
       "tags": []
@@ -54,7 +56,13 @@ A sample of **unencrypted options.json** can be:
 ```
 If options file is specified in higher level config, each endpoint can have `strings` list that program can match against. For example, for `my-endpoint-2`, program will check the returned response and if `string-1` and `string-2` exist in response, it is considered okay. If not, it will be considered down. In other cases like **connection timeout or 500** errors, it will be considered down again.
 
-You can also specifiy slack webhooks in options file and program will send a message in case it detects any down endpoint.
+You can also specifiy slack webhooks in options file and program will send a message in case it detects any down endpoint. To mention a **user** or **a custom team** in slack message, use `tags` option, a list, in webhooks. For example, to tag `user-321` on slack, you can specify it in `tags` list as `user-321` or `@user-321`. Similarly, you can add custom team in same `tags` list.
+>**For user tags to work, you need to have a valid `slack_bot_access_token` in options.**
+>
+>**For team tags to work, you need to have a valid `slack_workspace_access_token` in options.**
+>
+> *When you intsall a slack app in your workspace, you can get these tokens from app settings page.*
+
 
 ## Encryption / Decryption
 You can encrypt / decrypt data using `crypto.py` script. **(AES-256 Encryption)**
