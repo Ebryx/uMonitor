@@ -1,0 +1,10 @@
+{
+  "processes": 15,
+  "webhooks": [
+    "https://hooks.slack.com/services/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"
+  ],
+  "endpoints_file": "_endpoints.csv",
+  "options": {
+    "endpoints":  "_options.json"
+  }
+}

@@ -1,0 +1,6 @@
+endpoints.csv
+options.json
+_decrypted*
+_keys
+__pycache__/
+*.zip
