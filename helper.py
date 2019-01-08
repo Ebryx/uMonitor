@@ -6,6 +6,8 @@ import base64
 import logging
 import requests
 
+from crypto import decrypt_file
+
 
 CONFIG_FILE = 'config.json'
 
@@ -26,21 +28,22 @@ def read_config():
     if not config.get('processes'):
         config['processes'] = 15
 
-    if not config.get('webhooks'):
-        config['webhooks'] = list()
+    if config.get('options'):
+        options = decrypt_file(config['options'], False)
+        load_options(config, options)
 
     return config
 
 
-def load_options(config, options, subkey):
+def load_options(config, options):
 
     if not config.get('options'):
         config['options'] = dict()
 
     try:
-        config['options'][subkey] = json.loads(options)
+        config['options'] = json.loads(options)
     except json.JSONDecodeError:
-        config['options'][subkey] = options
+        exit('JSON decode error occured while parsing options file.')
 
 
 def display_endpoints():
@@ -68,7 +71,11 @@ def send_to_slack(data):
         prepared_string += '> %s  `Status Code: %s`\n' % (entry[0], entry[1])
 
     config = read_config()
-    for hook in config.get('webhooks'):
+    if not(config.get('options') and config['options'].get('webhooks')):
+        logger.info('No webhook is specified. Exiting program.')
+        exit()
+
+    for hook in config['options']['webhooks']:
 
         response, _count = (None, 0)
         while not response and _count < 5:

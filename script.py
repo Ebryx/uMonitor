@@ -3,7 +3,7 @@ import logging
 import requests
 from crypto import decrypt_file
 from multiprocessing import Process, Pipe
-from helper import read_config, send_to_slack, load_options
+from helper import read_config, send_to_slack
 
 
 logger = logging.getLogger(__name__)
@@ -25,17 +25,17 @@ def check_content(endpoint, content, config):
     if not config.get('options'):
         return True
 
-    if not config['options'].get('/endpoints'):
+    if not config['options'].get('endpoints'):
         return True
 
-    for ep, options in config['options']['/endpoints'].items():
-        if ep != endpoint:
+    for ep_name, ep_options in config['options']['endpoints'].items():
+        if ep_name != endpoint:
             continue
 
-        if not options.get('strings'):
+        if not ep_options.get('strings'):
             return True
 
-        for str_token in options['strings']:
+        for str_token in ep_options['strings']:
             if str_token not in content:
                 return False
 
@@ -67,10 +67,6 @@ def main(event, context):
     config = read_config()
     content = decrypt_file(config.get('endpoints_file'), False)
 
-    if config.get('options') and config['options'].get('endpoints'):
-        options = decrypt_file(config['options']['endpoints'], False)
-        load_options(config, options, '/endpoints')
-
     endpoints = list()
     for line in csv.reader(content.split('\n')[1:]):
         if len(line) > 0 and 'sample.domain' not in line[0]:
@@ -98,7 +94,7 @@ def main(event, context):
     for connection in connections:
         downpoints.extend(connection.recv())
 
-    # send_to_slack({'total': len(endpoints), 'down': downpoints})
+    send_to_slack({'total': len(endpoints), 'down': downpoints})
     for ep in downpoints:
         logger.info(ep)
 
