@@ -62,28 +62,28 @@ def encrypt_file(params):
 
     if params.new:
         aes_key = get_random_string(KEY_LENGTH)
-        aes_iv = get_random_string(IV_LENGTH)
+        aes_key += b'-' + get_random_string(IV_LENGTH)
 
     else:
-        if not (os.environ.get('AES_KEY') and os.environ.get('AES_IV')):
-            exit('`AES_KEY`, `AES_IV` don\'t exist in environment variables.')
+        if not os.environ.get('AES_KEY'):
+            exit('`AES_KEY` doesn\'t exist in environment variables.')
 
         aes_key = os.environ.get('AES_KEY').encode('utf8')
-        aes_iv = os.environ.get('AES_IV').encode('utf8')
+        if len(aes_key.split(b'-')) != 2:
+            exit('Invalid AES key detected.')
 
     content = open(csvfile, 'r').read()
-    content = adjust_padding(content, len(aes_key))
-    cipher = Cipher(algorithms.AES(aes_key), modes.CBC(aes_iv),
-                    backend=default_backend())
+    content = adjust_padding(content, KEY_LENGTH)
+    cipher = Cipher(
+        algorithms.AES(aes_key.split(b'-')[0]),
+        modes.CBC(aes_key.split(b'-')[-1]),
+        backend=default_backend())
 
     encryptor = cipher.encryptor()
     ciphertext = encryptor.update(content) + encryptor.finalize()
 
     open('_' + csvfile, 'wb').write(ciphertext)
-    open('_keys', 'wb').writelines([
-        b'export AES_KEY=%s\n' % (aes_key),
-        b'export AES_IV=%s\n' % (aes_iv)
-    ])
+    open('_keys', 'wb').writelines([b'export AES_KEY=%s\n' % (aes_key)])
 
     logger.info('Successfully encrypted endpoints ' +
                 'in: %s' % ('_' + csvfile))
@@ -96,19 +96,20 @@ def decrypt_file(csvfile, write_to_file=True):
 
     # aes_key = open('_keys', 'rb').readlines()[0].strip(b'\n')
     # aes_iv = open('_keys', 'rb').readlines()[1].strip(b'\n')
-    if not (os.environ.get('AES_KEY') and os.environ.get('AES_IV')):
-        exit('`AES_KEY`, `AES_IV` don\'t exist in environment variables.')
+    if not os.environ.get('AES_KEY'):
+        exit('`AES_KEY` doesn\'t exist in environment variables.')
 
     aes_key = os.environ.get('AES_KEY').encode('utf8')
-    aes_iv = os.environ.get('AES_IV').encode('utf8')
 
     ciphertext = open(csvfile, 'rb').read()
-    cipher = Cipher(algorithms.AES(aes_key), modes.CBC(aes_iv),
-                    backend=default_backend())
+    cipher = Cipher(
+        algorithms.AES(aes_key.split(b'-')[0]),
+        modes.CBC(aes_key.split(b'-')[-1]),
+        backend=default_backend())
 
     decryptor = cipher.decryptor()
     content = decryptor.update(ciphertext) + decryptor.finalize()
-    content = adjust_padding(content, len(aes_key), unpad=True)
+    content = adjust_padding(content, KEY_LENGTH, unpad=True)
 
     if write_to_file:
         open('_decrypted_' + csvfile, 'w').write(content)

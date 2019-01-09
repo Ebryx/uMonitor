@@ -52,12 +52,12 @@
                         "Version": "2012-10-17",
                         "Statement": [{
                             "Effect": "Allow",
-                            "Action": ["kms:*"],
-                            "Resource": "*"
-                        }, {
-                            "Effect": "Allow",
-                            "Action": ["s3:Get*"],
-                            "Resource": "arn:aws:s3:::*/*"
+                            "Action": [
+                                "logs:CreateLogGroup",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ],
+                            "Resource": "arn:aws:logs:*:*:*"
                         }]
                     }
                 }]
