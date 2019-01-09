@@ -51,9 +51,10 @@ def check_endpoints_status(endpoints_list, connection, config):
             response = requests.post('http://' + ep.replace(
                 'http://', '').replace('https://', ''), timeout=(1, 2))
 
-            if not check_content(ep, str(response.content), config):
-                downpoints.append((ep, 'content-mismatch'))
-            elif response.status_code >= 500:
+            if check_content(ep, str(response.content), config):
+                continue
+
+            if response.status_code >= 500:
                 downpoints.append((ep, response.status_code))
 
         except requests.exceptions.ConnectTimeout:

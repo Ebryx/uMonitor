@@ -2,19 +2,19 @@ AWSTemplateFormatVersion: 2010-09-09
 Parameters:
   LambdaName:
     Type: String
-    Description: 'Name of your lambda.'
+    Description: Name of your lambda.
   S3BucketName:
     Type: String
-    Description: 'S3 bucket name containing lambda code.'
+    Description: S3 bucket name containing lambda code.
   S3CodeArchivePath:
     Type: String
-    Description: 'Lambda code path inside selected S3 bucket.'
+    Description: Lambda code path inside selected S3 bucket.
   AESKey:
     Type: String
-    Description: 'AES key that code needs to decrypt config file.'
+    Description: AES key that code needs to decrypt config file.
   ConfigFile:
     Type: String
-    Description: 'S3 public path to config file.'
+    Description: S3 public path to config file.
 Resources:
   IAMRoleInstance:
     Type: 'AWS::IAM::Role'
@@ -80,6 +80,17 @@ Resources:
           Value: Cloudformation Template
     DependsOn:
       - IAMRoleInstance
+  KMSKeyAliasInstance:
+    Type: 'AWS::KMS::Alias'
+    Properties:
+      AliasName: !Join
+        - ''
+        - - 'alias/'
+          - !Ref LambdaName
+          - '-key'
+      TargetKeyId: !Ref KMSKeyInstance
+    DependsOn:
+      - KMSKeyInstance
   LambdaInstance:
     Type: 'AWS::Lambda::Function'
     Properties:
@@ -111,6 +122,30 @@ Resources:
     DependsOn:
       - IAMRoleInstance
       - KMSKeyInstance
+  CloudwatchEvent:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: !Join 
+        - ''
+        - - 'Rule for '
+          - !Ref LambdaName
+          - ' lambda.'
+      Name: !Join 
+        - ''
+        - - !Ref LambdaName
+          - '-rule'
+      ScheduleExpression: 'cron(*/5 * * * ? *)'
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt 
+            - LambdaInstance
+            - Arn
+          Id: !Join 
+            - ''
+            - - ruleTarget
+              - !Ref LambdaName
+    DependsOn:
+      - LambdaInstance
 Outputs:
   LambdaName:
     Description: Name of created AWS Lambda function.
