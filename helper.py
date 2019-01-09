@@ -4,12 +4,11 @@ import json
 import time
 import base64
 import logging
+import argparse
 import requests
 
 from crypto import decrypt_file
 
-
-CONFIG_FILE = 'config.json'
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -20,57 +19,83 @@ handle.setFormatter(logging.Formatter('%(asctime)s: %(message)s'))
 logger.addHandler(handle)
 
 
-def read_config():
-    if not os.path.isfile(CONFIG_FILE):
-        exit('No config file found: %s' % (CONFIG_FILE))
+def define_params():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-config', default=os.environ.get('CONFIG_FILE'),
+                        help='path to config file for program. ' +
+                        '[default: CONFIG_FILE env variable]')
+    parser.add_argument('--add', type=str, default='endpoints.csv',
+                        help='path to endpoints file to add to config. ' +
+                        '[default: endpoints.csv]')
 
-    config = json.load(open(CONFIG_FILE, 'r'))
+    return parser.parse_args()
+
+
+def read_config(filename, is_directtext=False):
+
+    if not is_directtext:
+        if not os.path.isfile(filename):
+            exit('Config file doesn\'t exist: %s\n' % (filename))
+        content = open(filename, 'r').read()
+    else:
+        content = filename
+
+    try:
+        config = json.loads(content)
+    except json.JSONDecodeError:
+        exit('JSON decode error occured while parsing config ' +
+             'file: %s\n' % (filename)) if not is_directtext else \
+             exit('JSON decode error while parsing config content.\n')
+
     if not config.get('processes'):
         config['processes'] = 15
-
-    if config.get('options'):
-        options = decrypt_file(config['options'], False)
-        load_options(config, options)
 
     return config
 
 
-def load_options(config, options):
+def add_endpoints(config, params):
 
-    if not config.get('options'):
-        config['options'] = dict()
+    endpoints_file = None
+    if params.add and os.path.isfile(params.add):
+        endpoints_file = params.add
+        logger.info('Endpoints file detected from parameters: ' +
+                    '%s' % (params.add))
+    else:
+        logger.info('Endpoints file was not provided in script params. ' +
+                    'Fetching endpoints file from main config ' +
+                    'file: %s' % (params.config))
 
-    try:
-        config['options'] = json.loads(options)
-    except json.JSONDecodeError:
-        exit('JSON decode error occured while parsing options file.')
+        if not config.get('endpoints_file'):
+            exit('No endpoints file is provided in config.')
 
+        if not os.path.isfile(config['endpoints_file']):
+            exit('File doesn\'t exists for endpoints: %s' % (
+                config['endpoints_file']))
 
-def display_endpoints():
+        endpoints_file = config['endpoints_file']
 
-    config = read_config()
-    if not config.get('endpoints_file'):
-        exit('No key `endpoints_file` exists in config.')
+    endpoints = list()
+    content = open(endpoints_file, 'r').read()
+    for line in csv.reader(content.split('\n')[1:]):
+        if len(line) > 0 and 'sample.domain' not in line[0]:
+            endpoints.append(line[0])
 
-    endpoints = [x[0] for x in csv.reader(open(config.get(
-        'endpoints_file'), 'r').readlines()[1:]) if len(x) > 0
-        if 'sample.domain' not in x[0]]
-
-    for ep in endpoints:
-        print('"%s",' % (ep))
+    config['endpoints'] = endpoints
+    json.dump(config, open(params.config, 'w'), sort_keys=True, indent=2)
+    logger.info('Config file is unified with endpoints: %s' % (params.config))
 
 
 def get_slack_user_ids(tags, config):
 
-    if not config['options'].get('slack_bot_access_token'):
-        logger.info('`slack_bot_access_token` is required in ' +
-                    'options to get user ids.')
+    if not config.get('slack_bot_access_token'):
+        logger.info('`slack_bot_access_token` is required ' +
+                    'for slack to get user ids.')
 
         return list()
 
     response = requests.get(
         'https://slack.com/api/users.list?token=' +
-        config['options']['slack_bot_access_token']).json()
+        config['slack_bot_access_token']).json()
 
     if not(response.get('ok') and response.get('members')):
         logger.info('Failed to get userIDs for link tags: %s' % (tags))
@@ -91,14 +116,14 @@ def get_slack_user_ids(tags, config):
 
 def get_slack_team_ids(tags, config):
 
-    if not config['options'].get('slack_workstation_access_token'):
-        logger.info('`slack_workstation_access_token` is required in ' +
-                    'options to get team ids.')
+    if not config.get('slack_workstation_access_token'):
+        logger.info('`slack_workstation_access_token` is required ' +
+                    'for slack to get team ids.')
         return list()
 
     response = requests.get(
         'https://slack.com/api/usergroups.list?token=' +
-        config['options']['slack_workstation_access_token']).json()
+        config['slack_workstation_access_token']).json()
 
     if not(response.get('ok') and response.get('usergroups')):
         logger.info('Failed to get teamIDs for link tags: %s' % (tags))
@@ -116,7 +141,7 @@ def get_slack_team_ids(tags, config):
     return team_ids
 
 
-def send_to_slack(data):
+def send_to_slack(data, config):
 
     prepared_string = '*%d/%d* endpoints are up.\n' % (
         data['total'] - len(data['down']), data['total'])
@@ -126,12 +151,11 @@ def send_to_slack(data):
     for entry in data['down']:
         prepared_string += '> %s  `Status Code: %s`\n' % (entry[0], entry[1])
 
-    config = read_config()
-    if not(config.get('options') and config['options'].get('webhooks')):
-        logger.info('No webhook is specified. Exiting program.')
-        exit()
+    if not config.get('webhooks'):
+        logger.info('No webhook is specified. Skipping slack push.')
+        return
 
-    for url, data in config['options']['webhooks'].items():
+    for url, data in config['webhooks'].items():
 
         users = get_slack_user_ids(data.get('tags', list()), config)
         teams = get_slack_team_ids(data.get('tags', list()), config)
@@ -161,4 +185,8 @@ def send_to_slack(data):
 
 
 if __name__ == "__main__":
-    display_endpoints()
+
+    params = define_params()
+    if params.add:
+        config = read_config(params.config)
+        add_endpoints(config, params)

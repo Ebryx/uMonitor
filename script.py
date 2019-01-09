@@ -1,4 +1,4 @@
-import csv
+import os
 import logging
 import requests
 from crypto import decrypt_file
@@ -22,6 +22,7 @@ def chunk_list(endpoints_list, chunk_size):
 
 
 def check_content(endpoint, content, config):
+
     if not config.get('options'):
         return True
 
@@ -65,16 +66,39 @@ def check_endpoints_status(endpoints_list, connection, config):
 
 def main(event, context):
 
-    config = read_config()
-    content = decrypt_file(config.get('endpoints_file'), False)
+    if not os.environ.get('CONFIG_FILE'):
+        exit('No CONFIG_FILE environment variable exists.\n')
 
-    endpoints = list()
-    for line in csv.reader(content.split('\n')[1:]):
-        if len(line) > 0 and 'sample.domain' not in line[0]:
-            endpoints.append(line[0])
+    config_file = os.environ['CONFIG_FILE']
+    if config_file.startswith(('http', 'https', 'ftp')):
+        logger.info('Config file prefix tells program to fetch it online.')
+        logger.info('Fetching config file: %s' % (config_file))
+        response = requests.get(config_file)
+        if response.status_code < 400:
+            ciphertext = response.content
+        else:
+            logger.info('Could not fetch config file: %s' % (response))
+            exit('Exiting program.\n')
+
+    else:
+        logger.info('Config file prefix tells program to search ' +
+                    'for it on filesystem.')
+
+        if not os.path.isfile(config_file):
+            exit('Config file doesn\'t exist on ' +
+                 'filesystem: %s\n' % (config_file))
+
+        ciphertext = open(config_file, 'rb').read()
+
+    content = decrypt_file(ciphertext, write_to_file=False, is_ciphertext=True)
+    config = read_config(content, is_directtext=True)
+
+    if not config.get('endpoints'):
+        exit('No endpoints detected in config file.\n')
 
     processes = list()
     connections = list()
+    endpoints = config['endpoints']
     for elist in chunk_list(endpoints, len(endpoints) // config['processes']):
 
         parent, child = Pipe()
@@ -95,10 +119,13 @@ def main(event, context):
     for connection in connections:
         downpoints.extend(connection.recv())
 
-    send_to_slack({'total': len(endpoints), 'down': downpoints})
-    for ep in downpoints:
-        logger.info(ep)
+    if downpoints:
+        send_to_slack({'total': len(endpoints), 'down': downpoints}, config)
+        for ep in downpoints:
+            logger.info(ep)
 
 
 if __name__ == "__main__":
+
+    # I see an emoji, what do you see?
     main({}, {})

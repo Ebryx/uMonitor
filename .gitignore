@@ -4,3 +4,4 @@ _decrypted*
 _keys
 __pycache__/
 *.zip
+config.json

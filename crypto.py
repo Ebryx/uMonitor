@@ -22,13 +22,13 @@ logger.addHandler(handle)
 
 def define_params():
     parser = argparse.ArgumentParser()
-    parser.add_argument('endpoints', help='path to csv file for endpoints.')
+    parser.add_argument('file', help='path to file that you want to target.')
+    parser.add_argument('-e', action='store_true',
+                        help='encrypts the provided file.')
+    parser.add_argument('-d', action='store_true',
+                        help='decrypts the provided file.')
     parser.add_argument('--new', action='store_true', help='creates new ' +
-                        'random keys if you are doing encryption.')
-    parser.add_argument('-E', action='store_true',
-                        help='encrypts the endpoints file.')
-    parser.add_argument('-D', action='store_true',
-                        help='decrypts the endpoints file.')
+                        'random keys in case of encryption.')
 
     return parser.parse_args()
 
@@ -56,9 +56,9 @@ def adjust_padding(data, block_size, unpad=False):
 
 def encrypt_file(params):
 
-    csvfile = params.endpoints
-    if not os.path.isfile(csvfile):
-        exit('No file exists: %s' % (csvfile))
+    filename = params.file
+    if not os.path.isfile(filename):
+        exit('File doesn\'t exist: %s' % (filename))
 
     if params.new:
         aes_key = get_random_string(KEY_LENGTH)
@@ -72,7 +72,7 @@ def encrypt_file(params):
         if len(aes_key.split(b'-')) != 2:
             exit('Invalid AES key detected.')
 
-    content = open(csvfile, 'r').read()
+    content = open(filename, 'r').read()
     content = adjust_padding(content, KEY_LENGTH)
     cipher = Cipher(
         algorithms.AES(aes_key.split(b'-')[0]),
@@ -82,26 +82,27 @@ def encrypt_file(params):
     encryptor = cipher.encryptor()
     ciphertext = encryptor.update(content) + encryptor.finalize()
 
-    open('_' + csvfile, 'wb').write(ciphertext)
+    open('_' + filename, 'wb').write(ciphertext)
     open('_keys', 'wb').writelines([b'export AES_KEY=%s\n' % (aes_key)])
 
-    logger.info('Successfully encrypted endpoints ' +
-                'in: %s' % ('_' + csvfile))
+    logger.info('Successfully encrypted file in: %s' % ('_' + filename))
     logger.info('Encryption keys can be found in: %s' % ('_keys'))
 
 
-def decrypt_file(csvfile, write_to_file=True):
-    if not os.path.isfile:
-        exit('No file exists: %s' % (csvfile))
+def decrypt_file(filename, write_to_file=True, is_ciphertext=False):
 
-    # aes_key = open('_keys', 'rb').readlines()[0].strip(b'\n')
-    # aes_iv = open('_keys', 'rb').readlines()[1].strip(b'\n')
     if not os.environ.get('AES_KEY'):
         exit('`AES_KEY` doesn\'t exist in environment variables.')
-
     aes_key = os.environ.get('AES_KEY').encode('utf8')
 
-    ciphertext = open(csvfile, 'rb').read()
+    if not is_ciphertext:
+        if not os.path.isfile(filename):
+            exit('File doesn\'t exist: %s' % (filename))
+        ciphertext = open(filename, 'rb').read()
+
+    else:
+        ciphertext = filename
+
     cipher = Cipher(
         algorithms.AES(aes_key.split(b'-')[0]),
         modes.CBC(aes_key.split(b'-')[-1]),
@@ -111,10 +112,10 @@ def decrypt_file(csvfile, write_to_file=True):
     content = decryptor.update(ciphertext) + decryptor.finalize()
     content = adjust_padding(content, KEY_LENGTH, unpad=True)
 
-    if write_to_file:
-        open('_decrypted_' + csvfile, 'w').write(content)
-        logger.info('Successfully decrypted endpoints in: %s' % (
-            '_decrypted_' + csvfile))
+    if write_to_file and not is_ciphertext:
+        open('_decrypted_' + filename, 'w').write(content)
+        logger.info('Successfully decrypted file in: %s' % (
+            '_decrypted_' + filename))
 
     else:
         return content
@@ -123,7 +124,7 @@ def decrypt_file(csvfile, write_to_file=True):
 if __name__ == "__main__":
     params = define_params()
 
-    if params.E:
+    if params.e:
         encrypt_file(params)
-    elif params.D:
-        decrypt_file(params.endpoints)
+    elif params.d:
+        decrypt_file(params.file)
