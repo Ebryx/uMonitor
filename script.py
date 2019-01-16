@@ -1,7 +1,7 @@
 import os
 import logging
 import requests
-from crypto import decrypt_file
+from ebryx.crypto import decrypt_file
 from multiprocessing import Process, Pipe
 from helper import read_config, send_to_slack
 

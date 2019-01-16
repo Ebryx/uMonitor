@@ -7,8 +7,6 @@ import logging
 import argparse
 import requests
 
-from crypto import decrypt_file
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
