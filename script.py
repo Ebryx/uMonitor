@@ -14,6 +14,8 @@ handle.setLevel(logging.INFO)
 handle.setFormatter(logging.Formatter('%(asctime)s: %(message)s'))
 logger.addHandler(handle)
 
+HEADERS = {'User-Agent': 'uptime-monitor-45B3E3678F47717B73CEF5071F975F73'}
+
 
 def chunk_list(endpoints_list, chunk_size):
 
@@ -49,7 +51,8 @@ def check_endpoints_status(endpoints_list, connection, config):
     for ep in endpoints_list:
         try:
             response = requests.post('http://' + ep.replace(
-                'http://', '').replace('https://', ''), timeout=(1, 2))
+                'http://', '').replace('https://', ''),
+                headers=HEADERS, timeout=(1, 2))
 
             if check_content(ep, str(response.content), config):
                 continue
