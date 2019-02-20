@@ -147,7 +147,7 @@ def send_to_slack(data, config):
     prepared_string += 'Following endpoints seem to be down.\n'
 
     for entry in data['down']:
-        prepared_string += '> %s  `Status Code: %s`\n' % (entry[0], entry[1])
+        prepared_string += '> %s  *`%s`*\n' % (entry[0], entry[1])
 
     if not config.get('webhooks'):
         logger.info('No webhook is specified. Skipping slack push.')
@@ -164,7 +164,7 @@ def send_to_slack(data, config):
         while not response and _count < 5:
             try:
                 response = requests.post(url, json={
-                    'text': tag_string + prepared_string
+                    'text': 'SAMPLE\n' + tag_string + prepared_string
                 })
             except:
                 logger.info('Could not send slack request. ' +

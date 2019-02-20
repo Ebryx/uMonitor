@@ -5,3 +5,7 @@ _keys
 __pycache__/
 *.zip
 config.json
+_config.json
+.env
+.vscode/
+.venv/
