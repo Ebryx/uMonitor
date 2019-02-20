@@ -164,7 +164,7 @@ def send_to_slack(data, config):
         while not response and _count < 5:
             try:
                 response = requests.post(url, json={
-                    'text': 'SAMPLE\n' + tag_string + prepared_string
+                    'text': tag_string + prepared_string
                 })
             except:
                 logger.info('Could not send slack request. ' +
