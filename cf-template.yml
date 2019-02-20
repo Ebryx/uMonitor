@@ -3,6 +3,12 @@ Parameters:
   LambdaName:
     Type: String
     Description: Name of your lambda.
+  LambdaInterval:
+    Type: String
+    Description: Interval of your lambda (in minutes).
+  LambdaUserAgent:
+    Type: String
+    Description: User agent in HTTP headers to use in lambda.
   S3BucketName:
     Type: String
     Description: S3 bucket name containing lambda code.
@@ -103,6 +109,7 @@ Resources:
         Variables:
           AES_KEY: !Ref AESKey
           CONFIG_FILE: !Ref ConfigFile
+          CUSTOM_USER_AGENT: !Ref LambdaUserAgent
       Role: !Join 
         - ''
         - - 'arn:aws:iam::'
@@ -122,10 +129,10 @@ Resources:
     DependsOn:
       - IAMRoleInstance
       - KMSKeyInstance
-  CloudwatchEvent:
+  CloudWatchEvent:
     Type: 'AWS::Events::Rule'
     Properties:
-      Description: !Join 
+      Description: !Join
         - ''
         - - 'Rule for '
           - !Ref LambdaName
@@ -134,10 +141,14 @@ Resources:
         - ''
         - - !Ref LambdaName
           - '-rule'
-      ScheduleExpression: 'cron(*/5 * * * ? *)'
+      ScheduleExpression: !Join
+        - ''
+        - - 'cron(*/'
+          - !Ref LambdaInterval
+          - ' * * * ? *)'
       State: ENABLED
       Targets:
-        - Arn: !GetAtt 
+        - Arn: !GetAtt
             - LambdaInstance
             - Arn
           Id: !Join 
@@ -161,4 +172,9 @@ Outputs:
     Description: Name of attached KMS Key to AWS Lambda function.
     Value: !GetAtt 
       - KMSKeyInstance
+      - Arn
+  CloudWatchRule:
+    Description: Name of CloudWatch rule attached to AWS Lambda function.
+    Value: !GetAtt 
+      - CloudWatchEvent
       - Arn
