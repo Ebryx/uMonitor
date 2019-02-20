@@ -127,9 +127,12 @@ def main(event, context):
     if not config.get('endpoints'):
         exit('No endpoints detected in config file.\n')
 
-    processes = list()
-    connections = list()
+    processes, connections = list(), list()
     endpoints = config['endpoints']
+
+    if config['processes'] > len(endpoints):
+        config['processes'] = len(endpoints)
+
     for elist in chunk_list(endpoints, len(endpoints) // config['processes']):
 
         parent, child = Pipe()
