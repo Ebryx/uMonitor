@@ -148,15 +148,25 @@ Resources:
           - ' * * * ? *)'
       State: ENABLED
       Targets:
-        - Arn: !GetAtt
+        -
+          Arn: !GetAtt
             - LambdaInstance
             - Arn
           Id: !Join 
             - ''
-            - - ruleTarget
+            - - 'ruleTarget'
               - !Ref LambdaName
     DependsOn:
       - LambdaInstance
+  CloudWatchEventPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaName
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt
+          - CloudWatchEvent
+          - Arn
 Outputs:
   LambdaName:
     Description: Name of created AWS Lambda function.
