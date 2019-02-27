@@ -6,9 +6,6 @@ Parameters:
   LambdaInterval:
     Type: String
     Description: Interval of your lambda (in minutes).
-  LambdaUserAgent:
-    Type: String
-    Description: User agent in HTTP headers to use in lambda.
   S3BucketName:
     Type: String
     Description: S3 bucket name containing lambda code.
@@ -109,7 +106,6 @@ Resources:
         Variables:
           AES_KEY: !Ref AESKey
           CONFIG_FILE: !Ref ConfigFile
-          CUSTOM_USER_AGENT: !Ref LambdaUserAgent
       Role: !Join 
         - ''
         - - 'arn:aws:iam::'
