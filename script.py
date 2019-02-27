@@ -175,10 +175,10 @@ def main(event, context):
     session = boto3.session.Session(profile_name='ebryx-soc-l5')
     s3 = session.resource('s3')
 
-    if config.get('s3_path'):
+    if config.get('storage_path'):
         logger.info('Fetching storage file from S3...')
-        bucket = config['s3_path'].split('.com/')[-1].split('/')[0]
-        path = config['s3_path'].split(bucket)[-1].lstrip('/')
+        bucket = config['storage_path'].split('.com/')[-1].split('/')[0]
+        path = config['storage_path'].split(bucket)[-1].lstrip('/')
 
         try:
             s3.Bucket(bucket).download_file(path, STORAGE_FILENAME)
@@ -220,7 +220,7 @@ def main(event, context):
         send_to_slack({'total': len(endpoints), 'down': downpoints}, config)
 
     logger.info(str())
-    if config.get('s3_path'):
+    if config.get('storage_path'):
         logger.info('Updating storage file to S3...')
         storage_file = open(STORAGE_FILENAME, 'w')
         content = [','.join(x) + '\n' for x in storage_content]
