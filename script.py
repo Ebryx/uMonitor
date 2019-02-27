@@ -1,6 +1,11 @@
 import os
+import time
 import logging
 import requests
+
+import boto3
+import botocore
+
 from ebryx.crypto import decrypt_file
 from multiprocessing import Process, Pipe
 from helper import read_config, send_to_slack
@@ -16,9 +21,17 @@ handle.setFormatter(logging.Formatter('%(asctime)s: %(message)s'))
 logger.addHandler(handle)
 
 
+STORAGE_FILENAME = '/tmp/storage.data'
 HEADERS = {
     'User-Agent': os.environ.get('CUSTOM_USER_AGENT')
     if os.environ.get('CUSTOM_USER_AGENT') else 'requests-py3-lambda'}
+
+
+def update_headers(config):
+
+    global HEADERS
+    if config.get('custom_user_agent'):
+        HEADERS['User-Agent'] = config.get('custom_user_agent')
 
 
 def chunk_list(endpoints_list, chunk_size):
@@ -105,6 +118,7 @@ def main(event, context):
         logger.info('Config file prefix tells program to fetch it online.')
         logger.info('Fetching config file: %s' % (config_file))
         response = requests.get(config_file)
+
         if response.status_code < 400:
             ciphertext = response.content
         else:
@@ -123,6 +137,7 @@ def main(event, context):
 
     content = decrypt_file(ciphertext, write_to_file=False, is_ciphertext=True)
     config = read_config(content, is_directtext=True)
+    update_headers(config)
 
     if not config.get('endpoints'):
         exit('No endpoints detected in config file.\n')
@@ -154,10 +169,71 @@ def main(event, context):
         downpoints.extend(connection.recv())
 
     if downpoints:
-        send_to_slack({'total': len(endpoints), 'down': downpoints}, config)
-        for ep in downpoints:
-            logger.info(ep)
 
+        session = boto3.session.Session(profile_name='ebryx-soc-l5')
+        s3 = session.resource('s3')
+
+        if config.get('s3_path'):
+            logger.info('Fetching storage file from S3...')
+            bucket = config['s3_path'].split('.com/')[-1].split('/')[0]
+            path = config['s3_path'].split(bucket)[-1].lstrip('/')
+
+            try:
+                s3.Bucket(bucket).download_file(path, STORAGE_FILENAME)
+                storage_content = [
+                    tuple(x.strip('\n').split(','))
+                    for x in open(STORAGE_FILENAME, 'r').readlines()]
+
+            except botocore.exceptions.ClientError as exc:
+                storage_content = list()
+                logger.info('Exception while getting storage file: %s', exc)
+                logger.info(str())
+
+        logger.info(str())
+        for ep in downpoints.copy():
+            stamp = str(time.time()).split('.')[0]
+
+            is_ignored = False
+            for line in storage_content:
+
+                if line[0] == ep[0] and line[1] == ep[1] and \
+                        int(stamp) - int(line[-1]) < config.get(
+                            'suppression_mins', 30) * 60:
+                    downpoints.remove(ep)
+                    is_ignored = True
+
+                elif line[0] == ep[0]:
+                    line[-1] = stamp
+
+            if is_ignored:
+                logger.info('Supressed: %s', ep)
+            else:
+                entry = list(ep)
+                entry.append(stamp)
+                entry = tuple(entry)
+                storage_content.append(entry)
+                logger.info(ep)
+
+        if downpoints:
+            send_to_slack({'total': len(endpoints),
+                           'down': downpoints}, config)
+
+        logger.info(str())
+        if config.get('s3_path'):
+            logger.info('Updating storage file to S3...')
+            storage_file = open(STORAGE_FILENAME, 'w')
+            content = [','.join(x) + '\n' for x in storage_content]
+            storage_file.writelines(content)
+            storage_file.close()
+
+            try:
+                s3.Bucket(bucket).put_object(
+                    Body=open(STORAGE_FILENAME, 'rb').read(), Key=path)
+            except botocore.exceptions.ClientError as exc:
+                logger.info('Exception while updating storage file: %s', exc)
+                logger.info(str())
+
+            os.remove(STORAGE_FILENAME)
 
 if __name__ == "__main__":
 
