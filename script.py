@@ -88,7 +88,7 @@ def check_endpoints_status(endpoints_list, connection, config):
                     headers=HEADERS, timeout=(1, 2))
 
             if not check_content(ep, str(response.content), config):
-                downpoints.append((ep, '<reason: str-mismatch>'))
+                downpoints.append([ep, '<reason: str-mismatch>'])
                 continue
 
             if response.status_code >= 500:
@@ -97,8 +97,8 @@ def check_endpoints_status(endpoints_list, connection, config):
                 except KeyError:
                     code_desc = None
 
-                downpoints.append((ep, '<status-code: %s (%s)>' % (
-                    response.status_code, code_desc)))
+                downpoints.append([ep, '<status-code: %s (%s)>' % (
+                    response.status_code, code_desc)])
 
         except requests.exceptions.ConnectTimeout:
             downpoints.append((ep, '<reason: conn-timeout>'))
@@ -172,7 +172,7 @@ def main(event, context):
         logger.info('No endpoints were detected down.')
         exit()
 
-    session = boto3.session.Session(profile_name='ebryx-soc-l5')
+    session = boto3.session.Session()
     s3 = session.resource('s3')
 
     if config.get('storage_path'):
@@ -183,7 +183,7 @@ def main(event, context):
         try:
             s3.Bucket(bucket).download_file(path, STORAGE_FILENAME)
             storage_content = [
-                tuple(x.strip('\n').split(','))
+                x.strip('\n').split(',')
                 for x in open(STORAGE_FILENAME, 'r').readlines()]
 
         except botocore.exceptions.ClientError as exc:
@@ -203,6 +203,7 @@ def main(event, context):
                         'suppression_mins', 30) * 60:
                 downpoints.remove(ep)
                 is_ignored = True
+                break
 
             elif line[0] == ep[0]:
                 line[-1] = stamp
@@ -210,9 +211,8 @@ def main(event, context):
         if is_ignored:
             logger.info('Supressed: %s', ep)
         else:
-            entry = list(ep)
+            entry = ep.copy()
             entry.append(stamp)
-            entry = tuple(entry)
             storage_content.append(entry)
             logger.info(ep)
 
