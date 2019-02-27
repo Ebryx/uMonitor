@@ -104,6 +104,7 @@ def get_slack_user_ids(tags, config):
             if not(member.get('profile') and member[
                     'profile'].get('display_name')):
                 continue
+
             if member['profile']['display_name'] == \
                     uname.replace('@', str()):
                 user_ids.append(member['id'])
@@ -157,7 +158,8 @@ def send_to_slack(data, config):
 
         users = get_slack_user_ids(data.get('tags', list()), config)
         teams = get_slack_team_ids(data.get('tags', list()), config)
-        tag_string = ' '.join(['<@%s>' % x for x in users]) + ' '
+        tag_string = '<!here>'
+        tag_string += ' '.join(['<@%s>' % x for x in users]) + ' '
         tag_string += ' '.join(['<!subteam^%s>' % x for x in teams]) + '\n'
 
         response, _count = (None, 0)

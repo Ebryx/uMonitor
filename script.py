@@ -168,72 +168,73 @@ def main(event, context):
     for connection in connections:
         downpoints.extend(connection.recv())
 
+    if not downpoints:
+        logger.info('No endpoints were detected down.')
+        exit()
+
+    session = boto3.session.Session(profile_name='ebryx-soc-l5')
+    s3 = session.resource('s3')
+
+    if config.get('s3_path'):
+        logger.info('Fetching storage file from S3...')
+        bucket = config['s3_path'].split('.com/')[-1].split('/')[0]
+        path = config['s3_path'].split(bucket)[-1].lstrip('/')
+
+        try:
+            s3.Bucket(bucket).download_file(path, STORAGE_FILENAME)
+            storage_content = [
+                tuple(x.strip('\n').split(','))
+                for x in open(STORAGE_FILENAME, 'r').readlines()]
+
+        except botocore.exceptions.ClientError as exc:
+            storage_content = list()
+            logger.info('Exception while getting storage file: %s', exc)
+            logger.info(str())
+
+    logger.info(str())
+    for ep in downpoints.copy():
+        stamp = str(time.time()).split('.')[0]
+
+        is_ignored = False
+        for line in storage_content:
+
+            if line[0] == ep[0] and line[1] == ep[1] and \
+                    int(stamp) - int(line[-1]) < config.get(
+                        'suppression_mins', 30) * 60:
+                downpoints.remove(ep)
+                is_ignored = True
+
+            elif line[0] == ep[0]:
+                line[-1] = stamp
+
+        if is_ignored:
+            logger.info('Supressed: %s', ep)
+        else:
+            entry = list(ep)
+            entry.append(stamp)
+            entry = tuple(entry)
+            storage_content.append(entry)
+            logger.info(ep)
+
     if downpoints:
+        send_to_slack({'total': len(endpoints), 'down': downpoints}, config)
 
-        session = boto3.session.Session(profile_name='ebryx-soc-l5')
-        s3 = session.resource('s3')
+    logger.info(str())
+    if config.get('s3_path'):
+        logger.info('Updating storage file to S3...')
+        storage_file = open(STORAGE_FILENAME, 'w')
+        content = [','.join(x) + '\n' for x in storage_content]
+        storage_file.writelines(content)
+        storage_file.close()
 
-        if config.get('s3_path'):
-            logger.info('Fetching storage file from S3...')
-            bucket = config['s3_path'].split('.com/')[-1].split('/')[0]
-            path = config['s3_path'].split(bucket)[-1].lstrip('/')
+        try:
+            s3.Bucket(bucket).put_object(
+                Body=open(STORAGE_FILENAME, 'rb').read(), Key=path)
+        except botocore.exceptions.ClientError as exc:
+            logger.info('Exception while updating storage file: %s', exc)
+            logger.info(str())
 
-            try:
-                s3.Bucket(bucket).download_file(path, STORAGE_FILENAME)
-                storage_content = [
-                    tuple(x.strip('\n').split(','))
-                    for x in open(STORAGE_FILENAME, 'r').readlines()]
-
-            except botocore.exceptions.ClientError as exc:
-                storage_content = list()
-                logger.info('Exception while getting storage file: %s', exc)
-                logger.info(str())
-
-        logger.info(str())
-        for ep in downpoints.copy():
-            stamp = str(time.time()).split('.')[0]
-
-            is_ignored = False
-            for line in storage_content:
-
-                if line[0] == ep[0] and line[1] == ep[1] and \
-                        int(stamp) - int(line[-1]) < config.get(
-                            'suppression_mins', 30) * 60:
-                    downpoints.remove(ep)
-                    is_ignored = True
-
-                elif line[0] == ep[0]:
-                    line[-1] = stamp
-
-            if is_ignored:
-                logger.info('Supressed: %s', ep)
-            else:
-                entry = list(ep)
-                entry.append(stamp)
-                entry = tuple(entry)
-                storage_content.append(entry)
-                logger.info(ep)
-
-        if downpoints:
-            send_to_slack({'total': len(endpoints),
-                           'down': downpoints}, config)
-
-        logger.info(str())
-        if config.get('s3_path'):
-            logger.info('Updating storage file to S3...')
-            storage_file = open(STORAGE_FILENAME, 'w')
-            content = [','.join(x) + '\n' for x in storage_content]
-            storage_file.writelines(content)
-            storage_file.close()
-
-            try:
-                s3.Bucket(bucket).put_object(
-                    Body=open(STORAGE_FILENAME, 'rb').read(), Key=path)
-            except botocore.exceptions.ClientError as exc:
-                logger.info('Exception while updating storage file: %s', exc)
-                logger.info(str())
-
-            os.remove(STORAGE_FILENAME)
+        os.remove(STORAGE_FILENAME)
 
 if __name__ == "__main__":
 
