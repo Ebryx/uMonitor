@@ -46,6 +46,15 @@ Resources:
                   - 'logs:CreateLogStream'
                   - 'logs:PutLogEvents'
                 Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 's3:Get*'
+                  - 's3:PutObject'
+                Resource: !Join
+                  - ''
+                  - - 'arn:aws:s3:::'
+                    - !Ref S3BucketName
+                    - '/*'
   KMSKeyInstance:
     Type: 'AWS::KMS::Key'
     Properties:

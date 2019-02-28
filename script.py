@@ -170,7 +170,7 @@ def main(event, context):
 
     if not downpoints:
         logger.info('No endpoints were detected down.')
-        exit()
+        return
 
     session = boto3.session.Session()
     s3 = session.resource('s3')

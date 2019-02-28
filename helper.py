@@ -142,9 +142,9 @@ def get_slack_team_ids(tags, config):
 
 def send_to_slack(data, config):
 
-    prepared_string = '*%d/%d* endpoints are up.\n' % (
+    prepared_string = config.get('slack_prefix_message', str()) + '\n'
+    prepared_string += '*%d/%d* endpoints are up.\n' % (
         data['total'] - len(data['down']), data['total'])
-
     prepared_string += 'Following endpoints seem to be down.\n'
 
     for entry in data['down']:
@@ -158,7 +158,8 @@ def send_to_slack(data, config):
 
         users = get_slack_user_ids(data.get('tags', list()), config)
         teams = get_slack_team_ids(data.get('tags', list()), config)
-        tag_string = '<!here>'
+        tag_string = '<!here>' if '@here' in \
+                     data.get('tags', list()) else str()
         tag_string += ' '.join(['<@%s>' % x for x in users]) + ' '
         tag_string += ' '.join(['<!subteam^%s>' % x for x in teams]) + '\n'
 
