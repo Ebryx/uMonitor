@@ -5,8 +5,9 @@ import requests
 
 import boto3
 import botocore
+import opencrypt
 
-from ebryx.crypto import decrypt_file
+
 from multiprocessing import Process, Pipe
 from helper import read_config, send_to_slack
 from http.client import responses as http_responses
@@ -135,7 +136,8 @@ def main(event, context):
 
         ciphertext = open(config_file, 'rb').read()
 
-    content = decrypt_file(ciphertext, write_to_file=False, is_ciphertext=True)
+    content = opencrypt.decrypt_file(
+        ciphertext, write_to_file=False, is_ciphertext=True)
     config = read_config(content, is_directtext=True)
     update_headers(config)
 
@@ -152,10 +154,9 @@ def main(event, context):
 
         parent, child = Pipe()
         connections.append(parent)
-
-        process = Process(target=check_endpoints_status,
-                          args=(elist, child, config,))
-
+        process = Process(
+            target=check_endpoints_status,
+            args=(elist, child, config,))
         processes.append(process)
 
     for process in processes:
@@ -211,7 +212,7 @@ def main(event, context):
         if is_ignored:
             logger.info('Supressed: %s', ep)
         else:
-            entry = ep.copy()
+            entry = list(ep).copy()
             entry.append(stamp)
             storage_content.append(entry)
             logger.info(ep)
