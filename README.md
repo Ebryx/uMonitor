@@ -145,43 +145,43 @@ python helper.py -h
 ```
 
 ## Encryption / Decryption
-Use the ebryx encryption / decryption module.
+Confguration file in `.json` format is given in encrypted form and program decrypts it using AES keys provided in environment. For more information on encryption / decryption, look at [**opencrypt**](https://pypi.org/project/opencrypt/) library of python.
 
-https://github.com/EbryxLabs/ebryx#encryption--decryption
-
-**Note:** Program expects the given config file to be encrypted. It will always try to decrypt the config file using `AES_KEY` in your environment variables.
 
 ## Execution
-For execution, **`CONFIG_FILE`** and **`AES_KEY`** must be in your environment and **`CONFIG_FILE`** content must be encrypted using above **`AES_KEY`**. See encryption section, if you are not sure how to achieve it.
+For execution, **`CONFIG_FILE`**, **`AES_KEY`** and **`AES_IV`** must be in your environment and **`CONFIG_FILE`** content must be encrypted using the encryption keys. See encryption section, if you are not sure how to achieve it.
 
 If you have your encrypted config ready, you can run the script by typing:
 ```
 python script.py
 ```
 
-### Lambda Execution
-You need to upload a deployment package to either directly to **AWS Lambda** or to **S3** and then insert your bucket path to lambda. To create a deployment package:
-```
-# create archive with your libraries.
-cd /your/python/env/lib/python3.x/site-packages/
-zip -r9 myarchive.zip ./
-mv myarchive.zip /path/to/project/
-cd /path/to/project/
+## AWS Lambda Deployment
+- Create a deployment package, place it to S3 so you can specify it in your cloudformation process. You need make an archive containing all the required libraries as mentioned in `requirements.txt` file and python scripts containing the code.
+    ```
+    cd /path/to/env/lib/pythonx.x/site-packages/
+    zip -r9 <archive-name> ./
+    ```
+    From root directory of the project, add python scripts to the same archive you created above:
+    ```
+    zip -g <archive-name> *.py
+    ```
+- Or just execute following command to create lambda deployment package named `lambda_code-YYYY-mm-ddTHH-MM-SSZ.zip` command
+  ```
+  /bin/bash lambda_package_creator.sh /path/to/env/lib/pythonx.x/site-packages/
+  ```
 
-# add python scripts (necessary code files) of your project.
-zip -g myarchive.zip *.py
-```
-*Usually, you don't need to create your archive everytime you make a change. You can re-add your changed files by using zip utility command as follows:*
+Usually, you don't need to create your archive everytime you make a change. You can re-add your changed files by using zip utility command as follows:
 ```
 zip -g myarchive.zip changed_file # adds/updates file to archive.
 zip -d myarchive.zip file_in_archive # removes file from archive.
 ```
-*You can even check the archive structure, using unzip command as follows:*
+You can even check the archive structure, using unzip command as follows:
 ```
 unzip -l myarchive.zip
 ```
 
-### Configuration Changes
+## Configuration Changes
 When you change your config file for local execution, you will have to encrypt your config file and put the path in **`CONFIG_FILE`** of your environment.
 
 If you are using **AWS Lambda**, you can set **`CONFIG_FILE`** to a **S3** path that can be fetched; it can be public since the config file will be encrypted. Whenever you change the config file, encrypt it using encryption module of ebryx and  update the file on **S3**. **AWS Lambda** code will fetch the updated encrypted file, decrypt it and run the rest of program accordingly.
