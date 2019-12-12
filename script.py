@@ -75,10 +75,7 @@ def check_endpoints_status(endpoints_list, connection, config):
                 else dict()
 
             if 'user' in auth and 'pass' in auth:
-
-                logger.info(str())
                 logger.info('Basic Auth for: %s', ep)
-
                 response = requests.get('http://' + ep.replace(
                     'http://', '').replace('https://', ''),
                     headers=HEADERS, auth=(auth['user'], auth['pass']),
@@ -87,6 +84,11 @@ def check_endpoints_status(endpoints_list, connection, config):
                 response = requests.get('http://' + ep.replace(
                     'http://', '').replace('https://', ''),
                     headers=HEADERS, timeout=(1, 2))
+
+            logger.info('[%s][auth: %s][status code: %s][content: %s...]',
+                        ep, auth, response.status_code, str(
+                            response.content)[:100])
+            logger.info('-' * 60)
 
             if not check_content(ep, str(response.content), config):
                 downpoints.append([ep, '<reason: str-mismatch>'])
@@ -104,7 +106,7 @@ def check_endpoints_status(endpoints_list, connection, config):
         except requests.exceptions.ConnectTimeout:
             downpoints.append((ep, '<reason: conn-timeout>'))
         except requests.exceptions.ReadTimeout:
-            pass
+            downpoints.append((ep, '<reason: read-timeout>'))
 
     connection.send(downpoints)
 
@@ -236,6 +238,7 @@ def main(event, context):
             logger.info(str())
 
         os.remove(STORAGE_FILENAME)
+
 
 if __name__ == "__main__":
 
